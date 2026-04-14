@@ -1,0 +1,6 @@
+WELCOME_TEXT = "Вітаю в бібліотечному боті Oseredok Leipzig!"
+REGISTRATION_REQUSTED_TEXT = "Будь ласка, зареєструйтеся, щоб користуватися ботом."
+BOOK_NOT_FOUND_TEXT = "Книгу не знайдено."
+BOOK_TAKEN_TEXT = "Книгу успішно взято."
+BOOK_RETURNED_TEXT = "Книгу успішно повернуто."
+ACCESS_DENIED_TEXT = "У вас немає доступу до цієї дії."
