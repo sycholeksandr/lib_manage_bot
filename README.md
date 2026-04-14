@@ -26,9 +26,11 @@ Telegram-Bot for library managing.
 
 ```bash
 pip install -r requirements.txt
+```
 
 3. Create .env file, based on .env.example
 4. Run the bot
 
 ```bash
 python ./main.py
+```
