@@ -1,19 +1,16 @@
 # Oseredok Library Bot
 
-Telegram-бот для обліку бібліотечних книг.
+Telegram-Bot for library managing.
 
-## Основні можливості
+## Main features
 
-- реєстрація користувачів
-- взяття та повернення книг через deep link / QR
-- адмін-панель
-- додавання книг
-- редагування та видалення книг
-- примусове повернення книги
-- перегляд користувачів, у яких є книги на руках
-- генерація QR-кодів для книг
+- users registration
+- borrowing and returning of books using deep link / QR
+- admin-panel
+- book adding, editing and deleting
+- QR-Codes generation for books
 
-## Стек
+## Stack
 
 - Python
 - aiogram
@@ -22,10 +19,16 @@ Telegram-бот для обліку бібліотечних книг.
 - pytest
 - qrcode / Pillow
 
-## Запуск
+## Setup
 
-1. Створити та активувати віртуальне середовище
-2. Встановити залежності:
+1. Create and activate virtual environment
+2. Setup dependencies:
 
 ```bash
 pip install -r requirements.txt
+
+3. Create .env file, based on .env.example
+4. Run the bot
+
+```bash
+python ./main.py
