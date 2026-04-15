@@ -27,6 +27,7 @@ def get_admin_book_actions_keyboard(book_id: int, is_taken: bool = False) -> Inl
     builder.button(text="Редагувати", callback_data=f"overall_edit_book:{book_id}")
     if is_taken:
         builder.button(text="Примусово повернути", callback_data=f"force_return_book:{book_id}")
+    builder.button(text="Показати QR-код", callback_data=f"show_qr_code:{book_id}")
     builder.button(text="Видалити", callback_data=f"delete_book:{book_id}")
     builder.button(text="Скасувати", callback_data=f"cancel_book_action:{book_id}")
     builder.adjust(1)

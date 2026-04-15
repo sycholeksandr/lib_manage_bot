@@ -37,7 +37,7 @@ async def if_admin_user(session: AsyncSession, user_id: int):
     return True
 
 def build_book_deep_link(book_id: int) -> str:
-    return f"https://t.me/{settings.BPY_NAME}?start=book_{book_id}"
+    return f"https://t.me/{settings.TELEGRAM_BOT_NAME}?start=book_{book_id}"
 
 async def format_book_info(book, session) -> str:
     taken_at_str = book.taken_at.strftime("%d.%m.%Y") if book.taken_at else "—"
@@ -204,23 +204,6 @@ async def cmd_admin(
     await message.answer(
         "Адмін-панель відкрита.",
         reply_markup=get_admin_keyboard(),
-    )
-
-
-@router.message(lambda message: message.text == "Вийти з адмін-панелі")
-async def exit_admin_panel(
-    message: Message,
-    state: FSMContext,
-    session: AsyncSession,
-) -> None:
-    if not await if_admin_user(session=session, user_id=message.from_user.id):
-        await message.answer("У вас немає доступу до цієї дії.")
-        return
-
-    await state.clear()
-    await message.answer(
-        "Ви вийшли з адмін-панелі.",
-        reply_markup=get_remove_keyboard(),
     )
 
 
@@ -782,3 +765,45 @@ async def process_force_return_book(
         return
 
     await callback.answer("Сталася невідома помилка.", show_alert=True)
+    
+@router.callback_query(F.data.startswith("show_qr_code:"))
+async def process_show_qr_code(
+    callback: CallbackQuery,
+    session: AsyncSession,
+) -> None:
+    if not await if_admin_user(session=session, user_id=callback.from_user.id):
+        await callback.answer("У вас немає доступу до цієї дії.")
+        return
+
+    book_id_str = callback.data.removeprefix("show_qr_code:")
+
+    if not book_id_str.isdigit():
+        await callback.answer("Некоректний ID книги.", show_alert=True)
+        return
+
+    book_id = int(book_id_str)
+
+    book = await get_book_by_id_service(
+        session=session,
+        book_id=book_id,
+    )
+
+    if book is None:
+        await callback.answer("Книгу не знайдено.", show_alert=True)
+        return
+
+    deep_link = build_book_deep_link(book.id)
+    qr_buffer = generate_qr_code_with_book_id(
+        data=deep_link,
+        book_id=book.id,
+    )
+    qr_file = BufferedInputFile(
+        file=qr_buffer.getvalue(),
+        filename=f"book_{book.id}_qr.png",
+    )
+
+    await callback.message.answer_photo(
+        photo=qr_file,
+        caption=f"QR-код для книги ID {book.id}: «{book.title}»\n\nПосилання для книги:\n{deep_link}"
+    )
+    await callback.answer()

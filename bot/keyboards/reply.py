@@ -22,7 +22,6 @@ def get_admin_keyboard() -> ReplyKeyboardMarkup:
             ],
             [
                 KeyboardButton(text="Користувачі"),
-                KeyboardButton(text="Вийти з адмін-панелі"),
             ],
         ],
         resize_keyboard=True,
