@@ -21,6 +21,7 @@ async def create_book_service(
     title: str,
     description: str,
 ):
+    await create_log_entry(session, "create_book", None, None, title, user_full_name=None)
     return await create_book(session, title, description)
 
 
@@ -61,9 +62,9 @@ async def take_book_service(
     success = await take_book_if_available(session, book_id, user_id)
     if not success:
         return "book_already_taken"
-
-    
-    await create_log_entry(session, user_id, book_id, "take")
+    book_title = book.title
+    user_full_name = user.full_name    
+    await create_log_entry(session, "take", user_id, book_id, book_title, user_full_name)
     return "success"
 
 
@@ -86,8 +87,9 @@ async def return_book_service(
     success = await return_book_if_taken_by_user(session, book_id, user_id)
     if not success:
         return "book_taken_by_other_user"
-
-    await create_log_entry(session, user_id, book_id, "return")
+    book_title = book.title
+    user_full_name = user.full_name
+    await create_log_entry(session, "return", user_id, book_id, book_title, user_full_name)
     return "success"
 
 
@@ -113,8 +115,8 @@ async def force_return_book_service(
     success = await force_return_book(session, book_id)
     if not success:
         return "force_return_failed"
-
-    await create_log_entry(session, admin_id, book_id, "forced_return")
+    book_title = book.title
+    await create_log_entry(session, "forced_return", admin_id, book_id, book_title, None)
     return "success"
 
 async def update_book_service(
@@ -135,7 +137,7 @@ async def update_book_service(
 
     if book is None:
         return "book_not_found"
-
+    await create_log_entry(session, "update_book", None, book_id, book.title, user_full_name=None)
     return book
 
 
@@ -157,7 +159,8 @@ async def delete_book_service(
 
     if not deleted:
         return "book_not_found"
-
+    book_title = book.title
+    await create_log_entry(session, "delete_book", None, book_id, book_title, user_full_name=None)
     return "success"
 
 async def get_all_books_service(session: AsyncSession) -> list:

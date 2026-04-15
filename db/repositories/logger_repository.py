@@ -5,15 +5,19 @@ from db.models.logger import Logger
 
 async def create_log_entry(
     session: AsyncSession,
-    user_id: int,
-    book_id: int,
     action: str,
+    user_id: int | None=None,
+    book_id: int | None=None, 
+    book_title: str | None = None,
+    user_full_name: str | None = None
 ) -> Logger:
     new_log_entry = Logger(
+        action=action,
         user_id=user_id,
         book_id=book_id,
-        action=action,
-        timestamp=datetime.now(UTC)
+        timestamp=datetime.now(UTC),
+        book_title=book_title,
+        user_full_name=user_full_name
     )
 
     session.add(new_log_entry)
