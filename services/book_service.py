@@ -49,7 +49,11 @@ async def take_book_service(
     user = await get_user_by_id(session, user_id)
     if user is None:
         return "user_not_found"
-
+    
+    user_books = await get_books_by_user_id(session, user_id)
+    if len(user_books) >= 3:
+        return "user_book_limit_reached"
+    
     book = await get_book_by_id(session, book_id)
     if book is None:
         return "book_not_found"
@@ -58,6 +62,7 @@ async def take_book_service(
     if not success:
         return "book_already_taken"
 
+    
     await create_log_entry(session, user_id, book_id, "take")
     return "success"
 

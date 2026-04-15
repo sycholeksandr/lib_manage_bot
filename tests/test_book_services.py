@@ -401,3 +401,86 @@ async def test_get_user_books_service_returns_taken_books(db_session, clean_db):
     assert second_book.id in returned_ids
     assert third_book.id not in returned_ids
     assert len(books) == 2
+    
+@pytest.mark.asyncio
+async def test_take_book_service_returns_user_book_limit_reached_when_user_has_3_books(db_session):
+    user = await create_user_or_get_existing(
+        session=db_session,
+        user_id=100001,
+        full_name="Test User",
+        tg_username="test_user",
+        contact="+49111111111",
+    )
+
+    book_1 = await create_book_service(
+        session=db_session,
+        title="Book 1",
+        description="Description 1",
+    )
+    book_2 = await create_book_service(
+        session=db_session,
+        title="Book 2",
+        description="Description 2",
+    )
+    book_3 = await create_book_service(
+        session=db_session,
+        title="Book 3",
+        description="Description 3",
+    )
+    book_4 = await create_book_service(
+        session=db_session,
+        title="Book 4",
+        description="Description 4",
+    )
+
+    result_1 = await take_book_service(
+        session=db_session,
+        book_id=book_1.id,
+        user_id=user.id,
+    )
+    result_2 = await take_book_service(
+        session=db_session,
+        book_id=book_2.id,
+        user_id=user.id,
+    )
+    result_3 = await take_book_service(
+        session=db_session,
+        book_id=book_3.id,
+        user_id=user.id,
+    )
+
+    result_4 = await take_book_service(
+        session=db_session,
+        book_id=book_4.id,
+        user_id=user.id,
+    )
+
+    assert result_1 == "success"
+    assert result_2 == "success"
+    assert result_3 == "success"
+    assert result_4 == "user_book_limit_reached"
+    
+@pytest.mark.asyncio
+async def test_take_book_service_allows_new_book_after_return(db_session):
+    user = await create_user_or_get_existing(
+        session=db_session,
+        user_id=100003,
+        full_name="Return User",
+        tg_username="return_user",
+        contact="+49333333333",
+    )
+
+    book_1 = await create_book_service(session=db_session, title="Book 1", description="Desc 1")
+    book_2 = await create_book_service(session=db_session, title="Book 2", description="Desc 2")
+    book_3 = await create_book_service(session=db_session, title="Book 3", description="Desc 3")
+    book_4 = await create_book_service(session=db_session, title="Book 4", description="Desc 4")
+
+    assert await take_book_service(session=db_session, book_id=book_1.id, user_id=user.id) == "success"
+    assert await take_book_service(session=db_session, book_id=book_2.id, user_id=user.id) == "success"
+    assert await take_book_service(session=db_session, book_id=book_3.id, user_id=user.id) == "success"
+
+    assert await take_book_service(session=db_session, book_id=book_4.id, user_id=user.id) == "user_book_limit_reached"
+
+    assert await return_book_service(session=db_session, book_id=book_1.id, user_id=user.id) == "success"
+
+    assert await take_book_service(session=db_session, book_id=book_4.id, user_id=user.id) == "success"

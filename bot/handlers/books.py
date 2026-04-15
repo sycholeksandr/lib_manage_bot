@@ -83,7 +83,11 @@ async def process_take_book(
         await callback.message.edit_text("⚠️ Ця книга вже зайнята.")
         await callback.answer()
         return
-
+    if result == "user_book_limit_reached":
+        await callback.message.edit_text("⚠️ Ви не можете взяти більше 3 книг одночасно.")
+        await callback.answer()
+        return
+        
     await callback.message.edit_text("Сталася невідома помилка.")
     await callback.answer()
 
