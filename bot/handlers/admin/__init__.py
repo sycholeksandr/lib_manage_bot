@@ -8,6 +8,7 @@ from .force_return import router as force_return_router
 from .manage_books import router as manage_books_router
 from .qr import router as qr_router
 from .users import router as users_router
+from .books_catalog import router as books_catalog_router
 
 
 def get_admin_router() -> Router:
@@ -20,4 +21,5 @@ def get_admin_router() -> Router:
     router.include_router(users_router)
     router.include_router(force_return_router)
     router.include_router(qr_router)
+    router.include_router(books_catalog_router)
     return router

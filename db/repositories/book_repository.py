@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import func, select
 from db.models.book import Book
 from datetime import datetime, UTC
 
@@ -116,3 +116,17 @@ async def get_all_books(session: AsyncSession) -> list[Book]:
     stmt = select(Book)
     result = await session.execute(stmt)
     return result.scalars().all()
+
+async def get_books_page(
+    session: AsyncSession,
+    limit: int,
+    offset: int
+) -> list[Book]:
+    stmt = select(Book).order_by(Book.id).limit(limit).offset(offset)
+    result = await session.execute(stmt)
+    return result.scalars().all()
+
+async def count_books(session: AsyncSession) -> int:
+    stmt = select(func.count(Book.id))
+    result = await session.execute(stmt)
+    return result.scalar_one()

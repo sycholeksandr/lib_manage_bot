@@ -22,6 +22,7 @@ def get_admin_keyboard() -> ReplyKeyboardMarkup:
             ],
             [
                 KeyboardButton(text="Користувачі"),
+                KeyboardButton(text="Книги"),
             ],
         ],
         resize_keyboard=True,

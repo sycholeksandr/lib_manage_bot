@@ -10,7 +10,9 @@ from db.repositories.book_repository import (
     update_book,
     delete_book,
     get_all_books,
-    get_taken_books
+    get_taken_books,
+    count_books,
+    get_books_page,
 )
 from db.repositories.user_repository import get_user_by_id
 from db.repositories.logger_repository import create_log_entry
@@ -165,3 +167,18 @@ async def delete_book_service(
 
 async def get_all_books_service(session: AsyncSession) -> list:
     return await get_all_books(session)
+
+async def get_books_page_service(
+    session: AsyncSession,
+    limit: int,
+    offset: int,
+):
+    return await get_books_page(
+        session=session,
+        limit=limit,
+        offset=offset,
+    )
+
+
+async def count_books_service(session: AsyncSession) -> int:
+    return await count_books(session)

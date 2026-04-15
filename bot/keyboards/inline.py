@@ -49,3 +49,24 @@ def get_edit_book_fields_keyboard(book_id: int) -> InlineKeyboardMarkup:
     builder.button(text="Скасувати", callback_data=f"book_edit_menu:cancel:{book_id}")
     builder.adjust(1)
     return builder.as_markup()
+
+def get_books_catalog_keyboard(
+    current_page: int,
+    total_pages: int,
+) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+
+    if current_page > 1:
+        builder.button(
+            text="⬅️ Назад",
+            callback_data=f"books_page:{current_page - 1}",
+        )
+
+    if current_page < total_pages:
+        builder.button(
+            text="➡️ Далі",
+            callback_data=f"books_page:{current_page + 1}",
+        )
+
+    builder.adjust(2)
+    return builder.as_markup()
