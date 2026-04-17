@@ -218,6 +218,8 @@ async def send_book_qr(
     qr_buffer = generate_qr_code_with_book_id(
         data=deep_link,
         book_id=book.id,
+        author=book.author,
+        title=book.title,
     )
     qr_file = BufferedInputFile(
         file=qr_buffer.getvalue(),

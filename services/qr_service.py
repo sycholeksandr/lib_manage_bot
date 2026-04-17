@@ -4,7 +4,7 @@ import qrcode
 from PIL import Image, ImageDraw, ImageFont
 
 
-def generate_qr_code_with_book_id(data: str, book_id: int) -> BytesIO:
+def generate_qr_code_with_book_id(data: str, book_id: int, author: str = None, title: str = None) -> BytesIO:
     qr = qrcode.QRCode(
         version=None,
         error_correction=qrcode.constants.ERROR_CORRECT_M,
@@ -16,7 +16,7 @@ def generate_qr_code_with_book_id(data: str, book_id: int) -> BytesIO:
 
     qr_image = qr.make_image(fill_color="black", back_color="white").convert("RGB")
 
-    text = f"ID: {book_id}"
+    text = f"ID: {book_id} | {title or 'Назва відсутня'} | {author or 'Автор відсутній'}"
 
     try:
         font = ImageFont.truetype("arial.ttf", 28)

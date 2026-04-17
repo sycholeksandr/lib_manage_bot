@@ -46,7 +46,7 @@ def generate_qr_pdf(
         cell_y = page_height - margin_y - (row + 1) * cell_height - row * gutter_y
 
         deep_link = deep_link_builder(book.id)
-        qr_buffer = qr_generator_func(data=deep_link, book_id=book.id)
+        qr_buffer = qr_generator_func(data=deep_link, book_id=book.id, author=book.author, title=book.title)
 
         image = ImageReader(qr_buffer)
 
