@@ -10,6 +10,10 @@ class Book(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     title: Mapped[str] = mapped_column(Text, nullable=False)
+    author: Mapped[str] = mapped_column(Text, nullable=False)
+    publisher: Mapped[str] = mapped_column(Text, nullable=False)
+    genre: Mapped[str] = mapped_column(Text, nullable=False)
+    language: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     taken_by: Mapped[int] = mapped_column(BigInteger, nullable=True)
     taken_at: Mapped[datetime] = mapped_column(

@@ -45,6 +45,10 @@ def get_delete_book_confirmation_keyboard(book_id: int) -> InlineKeyboardMarkup:
 def get_edit_book_fields_keyboard(book_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="Змінити назву", callback_data=f"book_edit_menu:title:{book_id}")
+    builder.button(text="Змінити автора", callback_data=f"book_edit_menu:author:{book_id}")
+    builder.button(text="Змінити видавництво", callback_data=f"book_edit_menu:publisher:{book_id}")
+    builder.button(text="Змінити жанр", callback_data=f"book_edit_menu:genre:{book_id}")
+    builder.button(text="Змінити мову", callback_data=f"book_edit_menu:language:{book_id}")
     builder.button(text="Змінити опис", callback_data=f"book_edit_menu:description:{book_id}")
     builder.button(text="Скасувати", callback_data=f"book_edit_menu:cancel:{book_id}")
     builder.adjust(1)

@@ -15,7 +15,7 @@ from services.user_services import get_user_by_id_service
 router = Router()
 
 MAX_MESSAGE_LENGTH = 4000
-DESCRIPTION_PREVIEW_LENGTH = 15
+DESCRIPTION_PREVIEW_LENGTH = 30
 BLOCK_SEPARATOR = "\n----------------------\n"
 
 
@@ -79,6 +79,10 @@ async def format_book_info(book, session: AsyncSession) -> str:
     return (
         f"📖 <b>ID:</b> {book.id}\n"
         f"<b>Назва:</b> {book.title}\n"
+        f"<b>Автор:</b> {book.author or '—'}\n"
+        f"<b>Видавництво:</b> {book.publisher or '—'}\n"
+        f"<b>Жанр:</b> {book.genre or '—'}\n"
+        f"<b>Мова:</b> {book.language or '—'}\n"
         f"<b>Опис:</b> {short_description}\n"
         f"<b>Статус:</b> {status}\n"
         f"<b>Взята:</b> {taken_by_str}\n"
@@ -148,7 +152,10 @@ async def build_users_with_taken_books_blocks(
 
         for book in user_books:
             taken_at_str = book.taken_at.strftime("%d.%m.%Y") if book.taken_at else "—"
-            lines.append(f"• ID {book.id} — {book.title} ({taken_at_str})")
+            author_part = f" — {book.author}" if book.author else ""
+            lines.append(
+                f"• ID {book.id} — {book.title}{author_part} ({taken_at_str})"
+            )
 
         blocks.append("\n".join(lines))
 
@@ -217,12 +224,19 @@ async def send_book_qr(
         filename=f"book_{book.id}_qr.png",
     )
 
+    caption_parts = [
+        f'QR-код для книги ID {book.id}: «{book.title}»'
+    ]
+
+    if book.author:
+        caption_parts.append(f"Автор: {book.author}")
+
+    caption_parts.append("")
+    caption_parts.append(f"Посилання для книги:\n{deep_link}")
+
     await message.answer_photo(
         photo=qr_file,
-        caption=(
-            f"QR-код для книги ID {book.id}: «{book.title}»\n\n"
-            f"Посилання для книги:\n{deep_link}"
-        ),
+        caption="\n".join(caption_parts),
     )
 
 

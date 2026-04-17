@@ -26,6 +26,7 @@ async def send_book_view(
     if book.taken_by is None:
         await message.answer(
             f"📖 <b>{book.title}</b>\n\n"
+            f"{book.author or 'Автор відсутній.'}\n\n"
             f"{book.description or 'Опис відсутній.'}\n\n"
             f"Статус: доступна\n"
         )
@@ -37,6 +38,7 @@ async def send_book_view(
     if book.taken_by == user_id:
         await message.answer(
             f"📖 <b>{book.title}</b>\n\n"
+            f"{book.author or 'Автор відсутній.'}\n\n"
             f"{book.description or 'Опис відсутній.'}\n\n"
             f"Статус: ця книга зараз у вас\n"
         )
@@ -45,6 +47,7 @@ async def send_book_view(
 
     await message.answer(
         f"📖 <b>{book.title}</b>\n\n"
+        f"{book.author or 'Автор відсутній.'}\n\n"
         f"{book.description or 'Опис відсутній.'}\n\n"
         f"Статус: зараз недоступна"
     )
