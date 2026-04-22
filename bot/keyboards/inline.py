@@ -57,20 +57,41 @@ def get_edit_book_fields_keyboard(book_id: int) -> InlineKeyboardMarkup:
 def get_books_catalog_keyboard(
     current_page: int,
     total_pages: int,
+    filter_value: str,
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
 
     if current_page > 1:
         builder.button(
             text="⬅️ Назад",
-            callback_data=f"books_page:{current_page - 1}",
+            callback_data=f"books_page:{filter_value}:{current_page - 1}",
         )
-
+    else:
+        builder.button(
+            text="⬅️ Назад", callback_data="noop"
+        )
+                
+    builder.button(text=f"{current_page}/{total_pages}", callback_data="noop")
+    
     if current_page < total_pages:
         builder.button(
             text="➡️ Далі",
-            callback_data=f"books_page:{current_page + 1}",
+            callback_data=f"books_page:{filter_value}:{current_page + 1}",
+        )
+    else:
+        builder.button(
+            text="➡️ Далі",
+            callback_data="noop"
         )
 
-    builder.adjust(2)
+    builder.adjust(3)
+    return builder.as_markup()
+
+def get_book_separation_keyboard():
+    builder = InlineKeyboardBuilder()
+    builder.button(text="Доступні книги", callback_data="books_filter:available")
+    builder.button(text="Книги на руках", callback_data="books_filter:taken")
+    builder.button(text="Показати всі", callback_data="books_filter:all")
+    builder.button(text="До адмін-панелі", callback_data="books_filter:back")
+    builder.adjust(1)
     return builder.as_markup()

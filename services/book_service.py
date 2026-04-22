@@ -13,6 +13,8 @@ from db.repositories.book_repository import (
     return_book_if_taken_by_user,
     take_book_if_available,
     update_book,
+    count_available_books,
+    count_taken_books,
 )
 from db.repositories.logger_repository import create_log_entry
 from db.repositories.user_repository import get_user_by_id
@@ -53,10 +55,6 @@ async def get_book_by_id_service(
     book_id: int,
 ):
     return await get_book_by_id(session, book_id)
-
-
-async def get_taken_books_service(session: AsyncSession):
-    return await get_taken_books(session)
 
 
 async def get_user_books_service(
@@ -242,13 +240,26 @@ async def get_books_page_service(
     session: AsyncSession,
     limit: int,
     offset: int,
+    filter_type: str | None = None,
 ):
     return await get_books_page(
         session=session,
         limit=limit,
         offset=offset,
+        filter_type=filter_type,
     )
 
 
 async def count_books_service(session: AsyncSession) -> int:
     return await count_books(session)
+
+
+async def count_available_books_service(session):
+    return await count_available_books(session)
+
+
+async def count_taken_books_service(session):
+    return await count_taken_books(session)
+
+async def get_taken_books_service(session: AsyncSession):
+    return await get_taken_books(session)

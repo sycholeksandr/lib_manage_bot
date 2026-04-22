@@ -167,8 +167,13 @@ async def get_books_page(
     session: AsyncSession,
     limit: int,
     offset: int,
+    filter_type: str | None = None,
 ) -> list[Book]:
     stmt = select(Book).order_by(Book.id).limit(limit).offset(offset)
+    if filter_type == "available":
+        stmt = stmt.where(Book.taken_by.is_(None))
+    elif filter_type == "taken":
+        stmt = stmt.where(Book.taken_by.is_not(None))
     result = await session.execute(stmt)
     return result.scalars().all()
 
@@ -177,3 +182,19 @@ async def count_books(session: AsyncSession) -> int:
     stmt = select(func.count(Book.id))
     result = await session.execute(stmt)
     return result.scalar_one()
+
+async def count_available_books(session: AsyncSession) -> int:
+    stmt = select(func.count(Book.id)).where(Book.taken_by.is_(None))
+    result = await session.execute(stmt)
+    return result.scalar_one()
+
+
+async def count_taken_books(session: AsyncSession) -> int:
+    stmt = select(func.count(Book.id)).where(Book.taken_by.is_not(None))
+    result = await session.execute(stmt)
+    return result.scalar_one()
+
+async def get_taken_books(session: AsyncSession) -> list[Book]:
+    stmt = select(Book).where(Book.taken_by.is_not(None)).order_by(Book.id)
+    result = await session.execute(stmt)
+    return result.scalars().all()
