@@ -20,10 +20,15 @@ BLOCK_SEPARATOR = "\n----------------------\n"
 
 
 def build_book_deep_link(book_id: int) -> str:
+    """Build Telegram deep link for a specific book."""
     return f"https://t.me/{settings.TELEGRAM_BOT_NAME}?start=book_{book_id}"
 
 
-def truncate_text(text: str | None, max_length: int = DESCRIPTION_PREVIEW_LENGTH) -> str:
+def truncate_text(
+    text: str | None,
+    max_length: int = DESCRIPTION_PREVIEW_LENGTH,
+) -> str:
+    """Trim long text for compact admin rendering."""
     if not text:
         return "Опис відсутній."
     if len(text) <= max_length:
@@ -32,6 +37,7 @@ def truncate_text(text: str | None, max_length: int = DESCRIPTION_PREVIEW_LENGTH
 
 
 async def is_admin_user(session: AsyncSession, user_id: int) -> bool:
+    """Check whether given user has admin rights."""
     user = await get_user_by_id_service(session=session, user_id=user_id)
     return user is not None and user.is_admin
 
@@ -40,6 +46,7 @@ async def ensure_admin_message_access(
     message: Message,
     session: AsyncSession,
 ) -> bool:
+    """Validate admin access for message handlers."""
     if not await is_admin_user(session=session, user_id=message.from_user.id):
         await message.answer("У вас немає доступу до цієї дії.")
         return False
@@ -50,13 +57,18 @@ async def ensure_admin_callback_access(
     callback: CallbackQuery,
     session: AsyncSession,
 ) -> bool:
+    """Validate admin access for callback handlers."""
     if not await is_admin_user(session=session, user_id=callback.from_user.id):
-        await callback.answer("У вас немає доступу до цієї дії.", show_alert=True)
+        await callback.answer(
+            "У вас немає доступу до цієї дії.",
+            show_alert=True,
+        )
         return False
     return True
 
 
 async def format_book_info(book, session: AsyncSession) -> str:
+    """Build detailed admin card for a single book."""
     taken_at_str = book.taken_at.strftime("%d.%m.%Y") if book.taken_at else "—"
     short_description = truncate_text(book.description)
 
@@ -66,14 +78,21 @@ async def format_book_info(book, session: AsyncSession) -> str:
 
     if book.taken_by is not None:
         status = "на руках"
-        user = await get_user_by_id_service(session=session, user_id=book.taken_by)
-        taken_by_str = (
-            user.full_name if user else f"Невідомий користувач (ID: {book.taken_by})"
+        user = await get_user_by_id_service(
+            session=session,
+            user_id=book.taken_by,
         )
+        taken_by_str = (
+            user.full_name
+            if user
+            else f"Невідомий користувач (ID: {book.taken_by})"
+        )
+
         if user and user.tg_username:
             telegram_line = (
                 f'<b>Telegram:</b> '
-                f'<a href="https://t.me/{user.tg_username}">@{user.tg_username}</a>\n'
+                f'<a href="https://t.me/{user.tg_username}">'
+                f'@{user.tg_username}</a>\n'
             )
 
     return (
@@ -95,6 +114,7 @@ def split_blocks_into_messages(
     blocks: list[str],
     max_length: int = MAX_MESSAGE_LENGTH,
 ) -> list[str]:
+    """Split long text blocks into Telegram-safe message chunks."""
     messages: list[str] = []
     current_message = ""
 
@@ -120,6 +140,7 @@ async def build_users_with_taken_books_blocks(
     session: AsyncSession,
     books: list,
 ) -> list[str] | str:
+    """Build formatted blocks for users who currently hold books."""
     if not books:
         return "Зараз немає користувачів, у яких книги на руках."
 
@@ -145,16 +166,22 @@ async def build_users_with_taken_books_blocks(
         if user.tg_username:
             lines.append(
                 f'<b>Telegram:</b> '
-                f'<a href="https://t.me/{user.tg_username}">@{user.tg_username}</a>'
+                f'<a href="https://t.me/{user.tg_username}">'
+                f'@{user.tg_username}</a>'
             )
 
         lines.append("<b>Книги на руках:</b>")
 
         for book in user_books:
-            taken_at_str = book.taken_at.strftime("%d.%m.%Y") if book.taken_at else "—"
+            taken_at_str = (
+                book.taken_at.strftime("%d.%m.%Y")
+                if book.taken_at
+                else "—"
+            )
             author_part = f" — {book.author}" if book.author else ""
             lines.append(
-                f"• ID {book.id} — {book.title}{author_part} ({taken_at_str})"
+                f"• ID {book.id} — {book.title}{author_part} "
+                f"({taken_at_str})"
             )
 
         blocks.append("\n".join(lines))
@@ -169,6 +196,7 @@ async def send_chunked_messages(
     message: Message,
     blocks: list[str] | str,
 ) -> None:
+    """Send one or more messages depending on total text size."""
     if isinstance(blocks, str):
         await message.answer(blocks, reply_markup=get_admin_keyboard())
         return
@@ -187,6 +215,7 @@ async def send_book_card(
     session: AsyncSession,
     book,
 ) -> None:
+    """Send full book card as a new message."""
     await message.answer(
         await format_book_info(book, session),
         reply_markup=get_admin_book_actions_keyboard(
@@ -201,6 +230,7 @@ async def send_book_card_from_callback(
     session: AsyncSession,
     book,
 ) -> None:
+    """Replace current callback message with full book card."""
     await callback.message.edit_text(
         await format_book_info(book, session),
         reply_markup=get_admin_book_actions_keyboard(
@@ -210,10 +240,8 @@ async def send_book_card_from_callback(
     )
 
 
-async def send_book_qr(
-    message: Message,
-    book,
-) -> None:
+async def send_book_qr(message: Message, book) -> None:
+    """Generate and send QR code for a specific book."""
     deep_link = build_book_deep_link(book.id)
     qr_buffer = generate_qr_code_with_book_id(
         data=deep_link,
@@ -226,9 +254,7 @@ async def send_book_qr(
         filename=f"book_{book.id}_qr.png",
     )
 
-    caption_parts = [
-        f'QR-код для книги ID {book.id}: «{book.title}»'
-    ]
+    caption_parts = [f'QR-код для книги ID {book.id}: «{book.title}»']
 
     if book.author:
         caption_parts.append(f"Автор: {book.author}")
@@ -248,6 +274,7 @@ async def cmd_admin(
     state: FSMContext,
     session: AsyncSession,
 ) -> None:
+    """Open admin panel."""
     if not await ensure_admin_message_access(message, session):
         return
 
@@ -264,6 +291,7 @@ async def cancel_current_action(
     state: FSMContext,
     session: AsyncSession,
 ) -> None:
+    """Cancel current admin FSM flow."""
     if not await ensure_admin_message_access(message, session):
         return
 
@@ -287,12 +315,16 @@ async def cmd_all_books(
     message: Message,
     session: AsyncSession,
 ) -> None:
+    """Send all books as chunked admin cards."""
     if not await ensure_admin_message_access(message, session):
         return
 
     books = await get_all_books_service(session=session)
     if not books:
-        await message.answer("Книг не знайдено.", reply_markup=get_admin_keyboard())
+        await message.answer(
+            "Книг не знайдено.",
+            reply_markup=get_admin_keyboard(),
+        )
         return
 
     book_blocks = [await format_book_info(book, session) for book in books]

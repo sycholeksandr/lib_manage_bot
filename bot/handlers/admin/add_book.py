@@ -12,12 +12,24 @@ from .common import ensure_admin_message_access, send_book_qr
 router = Router()
 
 
+def _normalize_optional_text(value: str | None) -> str | None:
+    """Convert '-' to None and trim incoming text."""
+    raw_value = (value or "").strip()
+    return None if raw_value == "-" else raw_value
+
+
+def _is_too_short(value: str | None, min_length: int = 2) -> bool:
+    """Check whether optional text value is shorter than allowed."""
+    return value is not None and len(value) < min_length
+
+
 @router.message(lambda message: message.text == "Додати книгу")
 async def start_add_book(
     message: Message,
     state: FSMContext,
     session: AsyncSession,
 ) -> None:
+    """Start admin flow for creating a new book."""
     if not await ensure_admin_message_access(message, session):
         return
 
@@ -32,13 +44,16 @@ async def process_book_title(
     state: FSMContext,
     session: AsyncSession,
 ) -> None:
+    """Save book title and move to author step."""
     if not await ensure_admin_message_access(message, session):
         return
 
     title = (message.text or "").strip()
 
     if not title:
-        await message.answer("Назва книги не може бути порожньою. Спробуйте ще раз.")
+        await message.answer(
+            "Назва книги не може бути порожньою. Спробуйте ще раз."
+        )
         return
 
     if len(title) < 2:
@@ -47,7 +62,9 @@ async def process_book_title(
 
     await state.update_data(title=title)
     await state.set_state(AdminAddBookStates.waiting_for_author)
-    await message.answer('Введіть автора або "-" якщо поле треба залишити порожнім.')
+    await message.answer(
+        'Введіть автора або "-" якщо поле треба залишити порожнім.'
+    )
 
 
 @router.message(AdminAddBookStates.waiting_for_author)
@@ -56,19 +73,23 @@ async def process_book_author(
     state: FSMContext,
     session: AsyncSession,
 ) -> None:
+    """Save author and move to publisher step."""
     if not await ensure_admin_message_access(message, session):
         return
 
-    raw_value = (message.text or "").strip()
-    author = None if raw_value == "-" else raw_value
+    author = _normalize_optional_text(message.text)
 
-    if author is not None and len(author) < 2:
-        await message.answer('Автор надто короткий. Спробуйте ще раз або введіть "-"')
+    if _is_too_short(author):
+        await message.answer(
+            'Автор надто короткий. Спробуйте ще раз або введіть "-".'
+        )
         return
 
     await state.update_data(author=author)
     await state.set_state(AdminAddBookStates.waiting_for_publisher)
-    await message.answer('Введіть видавництво або "-" якщо поле треба залишити порожнім.')
+    await message.answer(
+        'Введіть видавництво або "-" якщо поле треба залишити порожнім.'
+    )
 
 
 @router.message(AdminAddBookStates.waiting_for_publisher)
@@ -77,19 +98,23 @@ async def process_book_publisher(
     state: FSMContext,
     session: AsyncSession,
 ) -> None:
+    """Save publisher and move to genre step."""
     if not await ensure_admin_message_access(message, session):
         return
 
-    raw_value = (message.text or "").strip()
-    publisher = None if raw_value == "-" else raw_value
+    publisher = _normalize_optional_text(message.text)
 
-    if publisher is not None and len(publisher) < 2:
-        await message.answer('Видавництво надто коротке. Спробуйте ще раз або введіть "-"')
+    if _is_too_short(publisher):
+        await message.answer(
+            'Видавництво надто коротке. Спробуйте ще раз або введіть "-".'
+        )
         return
 
     await state.update_data(publisher=publisher)
     await state.set_state(AdminAddBookStates.waiting_for_genre)
-    await message.answer('Введіть жанр або "-" якщо поле треба залишити порожнім.')
+    await message.answer(
+        'Введіть жанр або "-" якщо поле треба залишити порожнім.'
+    )
 
 
 @router.message(AdminAddBookStates.waiting_for_genre)
@@ -98,19 +123,23 @@ async def process_book_genre(
     state: FSMContext,
     session: AsyncSession,
 ) -> None:
+    """Save genre and move to language step."""
     if not await ensure_admin_message_access(message, session):
         return
 
-    raw_value = (message.text or "").strip()
-    genre = None if raw_value == "-" else raw_value
+    genre = _normalize_optional_text(message.text)
 
-    if genre is not None and len(genre) < 2:
-        await message.answer('Жанр надто короткий. Спробуйте ще раз або введіть "-"')
+    if _is_too_short(genre):
+        await message.answer(
+            'Жанр надто короткий. Спробуйте ще раз або введіть "-".'
+        )
         return
 
     await state.update_data(genre=genre)
     await state.set_state(AdminAddBookStates.waiting_for_language)
-    await message.answer('Введіть мову або "-" якщо поле треба залишити порожнім.')
+    await message.answer(
+        'Введіть мову або "-" якщо поле треба залишити порожнім.'
+    )
 
 
 @router.message(AdminAddBookStates.waiting_for_language)
@@ -119,19 +148,23 @@ async def process_book_language(
     state: FSMContext,
     session: AsyncSession,
 ) -> None:
+    """Save language and move to description step."""
     if not await ensure_admin_message_access(message, session):
         return
 
-    raw_value = (message.text or "").strip()
-    language = None if raw_value == "-" else raw_value
+    language = _normalize_optional_text(message.text)
 
-    if language is not None and len(language) < 2:
-        await message.answer('Мова надто коротка. Спробуйте ще раз або введіть "-"')
+    if _is_too_short(language):
+        await message.answer(
+            'Мова надто коротка. Спробуйте ще раз або введіть "-".'
+        )
         return
 
     await state.update_data(language=language)
     await state.set_state(AdminAddBookStates.waiting_for_description)
-    await message.answer('Тепер введіть опис книги або "-" якщо поле треба залишити порожнім.')
+    await message.answer(
+        'Тепер введіть опис книги або "-" якщо поле треба залишити порожнім.'
+    )
 
 
 @router.message(AdminAddBookStates.waiting_for_description)
@@ -140,12 +173,11 @@ async def process_book_description(
     state: FSMContext,
     session: AsyncSession,
 ) -> None:
+    """Create book after collecting all metadata."""
     if not await ensure_admin_message_access(message, session):
         return
 
-    raw_value = (message.text or "").strip()
-    description = None if raw_value == "-" else raw_value
-
+    description = _normalize_optional_text(message.text)
     data = await state.get_data()
     title = data.get("title")
 

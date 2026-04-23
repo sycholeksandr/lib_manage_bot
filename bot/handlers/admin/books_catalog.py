@@ -6,34 +6,52 @@ from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.keyboards.inline import (
+    get_admin_book_actions_keyboard,
     get_book_separation_keyboard,
     get_books_catalog_open_keyboard,
-    get_admin_book_actions_keyboard,
-)
-from services.book_service import (
-    count_books_service,
-    get_books_page_service,
-    count_available_books_service,
-    count_taken_books_service,
-    get_book_by_id_service,
 )
 from bot.keyboards.reply import get_admin_keyboard
+from services.book_service import (
+    count_available_books_service,
+    count_books_service,
+    count_taken_books_service,
+    get_book_by_id_service,
+    get_books_page_service,
+)
 
-from .common import ensure_admin_callback_access, ensure_admin_message_access, format_book_info
+from .common import (
+    ensure_admin_callback_access,
+    ensure_admin_message_access,
+    format_book_info,
+)
 
 router = Router()
 
 BOOKS_PER_PAGE = 10
+VALID_FILTERS = {"available", "taken", "all"}
 
 
 def format_book_catalog_page(current_page: int, total_books: int) -> str:
+    """Build short catalog header for current page."""
     start_index = (current_page - 1) * BOOKS_PER_PAGE + 1
     end_index = min(start_index + BOOKS_PER_PAGE - 1, total_books)
 
     return (
         f"📚 <b>Книги</b> ({start_index}–{end_index} з {total_books})\n"
-        f"Оберіть книгу:"
+        "Оберіть книгу:"
     )
+
+
+async def _count_books_by_filter(
+    session: AsyncSession,
+    filter_type: str,
+) -> int:
+    """Return total amount of books for selected filter."""
+    if filter_type == "available":
+        return await count_available_books_service(session)
+    if filter_type == "taken":
+        return await count_taken_books_service(session)
+    return await count_books_service(session)
 
 
 async def build_books_catalog_payload(
@@ -41,47 +59,29 @@ async def build_books_catalog_payload(
     page: int,
     filter_type: str,
 ) -> tuple[str, int, list]:
-    if filter_type == "available":
-        total_books = await count_available_books_service(session)
-    elif filter_type == "taken":
-        total_books = await count_taken_books_service(session)
-    else:
-        total_books = await count_books_service(session)
+    """Build paginated catalog data for the selected filter."""
+    total_books = await _count_books_by_filter(session, filter_type)
 
     if total_books == 0:
         return "Книг не знайдено.", 1, []
 
     total_pages = ceil(total_books / BOOKS_PER_PAGE)
-    page = max(1, min(page, total_pages))
-    offset = (page - 1) * BOOKS_PER_PAGE
+    safe_page = max(1, min(page, total_pages))
+    offset = (safe_page - 1) * BOOKS_PER_PAGE
 
-    if filter_type == "available":
-        books = await get_books_page_service(
-            session=session,
-            limit=BOOKS_PER_PAGE,
-            offset=offset,
-            filter_type="available",
-        )
-    elif filter_type == "taken":
-        books = await get_books_page_service(
-            session=session,
-            limit=BOOKS_PER_PAGE,
-            offset=offset,
-            filter_type="taken",
-        )
-    else:
-        books = await get_books_page_service(
-            session=session,
-            limit=BOOKS_PER_PAGE,
-            offset=offset,
-            filter_type=None,
-        )
+    page_filter = filter_type if filter_type in {"available", "taken"} else None
 
-    text = format_book_catalog_page(
-        current_page=page,
-        total_books=total_books,
+    books = await get_books_page_service(
+        session=session,
+        limit=BOOKS_PER_PAGE,
+        offset=offset,
+        filter_type=page_filter,
     )
 
+    text = format_book_catalog_page(
+        current_page=safe_page,
+        total_books=total_books,
+    )
     return text, total_pages, books
 
 
@@ -91,6 +91,7 @@ async def show_books_catalog(
     state: FSMContext,
     session: AsyncSession,
 ) -> None:
+    """Show filter selection menu for admin books catalog."""
     if not await ensure_admin_message_access(message, session):
         return
 
@@ -106,6 +107,7 @@ async def process_books_filter(
     callback: CallbackQuery,
     session: AsyncSession,
 ) -> None:
+    """Open first page of catalog for selected filter."""
     if not await ensure_admin_callback_access(callback, session):
         return
 
@@ -120,7 +122,7 @@ async def process_books_filter(
         await callback.answer()
         return
 
-    if filter_type not in {"available", "taken", "all"}:
+    if filter_type not in VALID_FILTERS:
         await callback.answer("Невідомий фільтр.", show_alert=True)
         return
 
@@ -141,13 +143,14 @@ async def process_books_filter(
         ),
     )
     await callback.answer()
-    
+
 
 @router.callback_query(F.data.startswith("books_page:"))
 async def paginate_books(
     callback: CallbackQuery,
     session: AsyncSession,
 ) -> None:
+    """Paginate catalog within the currently selected filter."""
     if not await ensure_admin_callback_access(callback, session):
         return
 
@@ -171,15 +174,15 @@ async def paginate_books(
             filter_value=filter_type,
         ),
     )
-
     await callback.answer()
-    
+
 
 @router.callback_query(F.data.startswith("open_book_from_catalog:"))
 async def open_book_from_catalog(
     callback: CallbackQuery,
     session: AsyncSession,
 ) -> None:
+    """Open full book card from catalog entry."""
     if not await ensure_admin_callback_access(callback, session):
         return
 
@@ -189,11 +192,9 @@ async def open_book_from_catalog(
         await callback.answer("Некоректний ID книги.", show_alert=True)
         return
 
-    book_id = int(book_id_str)
-
     book = await get_book_by_id_service(
         session=session,
-        book_id=book_id,
+        book_id=int(book_id_str),
     )
 
     if book is None:
@@ -207,4 +208,10 @@ async def open_book_from_catalog(
             is_taken=book.taken_by is not None,
         ),
     )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "noop")
+async def process_noop_callback(callback: CallbackQuery) -> None:
+    """Silently ignore clicks on inactive pagination buttons."""
     await callback.answer()

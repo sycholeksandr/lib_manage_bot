@@ -217,15 +217,14 @@ async def delete_book_service(
         session=session,
         book_id=book_id,
     )
-
     if not deleted:
         return "book_not_found"
-
+    
     await create_log_entry(
         session,
         "delete_book",
         None,
-        book_id,
+        None,
         book.title,
         user_full_name=None,
     )

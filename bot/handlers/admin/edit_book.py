@@ -3,6 +3,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bot.keyboards.inline import get_edit_book_fields_keyboard
 from bot.keyboards.reply import get_admin_keyboard
 from bot.states.admin import AdminManageBookStates
 from services.book_service import get_book_by_id_service, update_book_service
@@ -10,15 +11,68 @@ from services.book_service import get_book_by_id_service, update_book_service
 from .common import (
     ensure_admin_callback_access,
     ensure_admin_message_access,
+    format_book_info,
     send_book_card_from_callback,
 )
 
 router = Router()
 
 
-def get_edit_book_fields_keyboard(book_id: int):
-    from bot.keyboards.inline import get_edit_book_fields_keyboard
-    return get_edit_book_fields_keyboard(book_id)
+def _normalize_optional_text(value: str | None) -> str | None:
+    """Convert '-' to None and trim text."""
+    raw_value = (value or "").strip()
+    return None if raw_value == "-" else raw_value
+
+
+def _is_too_short(value: str | None, min_length: int = 2) -> bool:
+    """Check whether optional text value is shorter than allowed."""
+    return value is not None and len(value) < min_length
+
+
+async def _get_edit_book_id_or_reset(
+    message: Message,
+    state: FSMContext,
+) -> int | None:
+    """Extract edited book id from state or reset flow on failure."""
+    data = await state.get_data()
+    book_id = data.get("edit_book_id")
+
+    if book_id is None:
+        await state.clear()
+        await message.answer(
+            "Сталася помилка стану. Почніть редагування книги ще раз.",
+            reply_markup=get_admin_keyboard(),
+        )
+        return None
+
+    return book_id
+
+
+async def _handle_update_result(
+    message: Message,
+    result,
+    success_text: str,
+    session: AsyncSession,
+) -> None:
+    """Send unified response for book update operations."""
+    if result == "book_not_found":
+        await message.answer(
+            "Книгу не знайдено.",
+            reply_markup=get_admin_keyboard(),
+        )
+        return
+
+    if result == "nothing_to_update":
+        await message.answer(
+            "Немає даних для оновлення.",
+            reply_markup=get_admin_keyboard(),
+        )
+        return
+
+    await message.answer(
+        f"{success_text}\n\n{await format_book_info(result, session)}",
+        reply_markup=get_admin_keyboard(),
+    )
 
 
 @router.callback_query(F.data.startswith("overall_edit_book:"))
@@ -27,6 +81,7 @@ async def process_edit_book(
     state: FSMContext,
     session: AsyncSession,
 ) -> None:
+    """Open field selection menu for chosen book."""
     if not await ensure_admin_callback_access(callback, session):
         return
 
@@ -62,6 +117,7 @@ async def process_edit_book_menu(
     state: FSMContext,
     session: AsyncSession,
 ) -> None:
+    """Route admin to proper FSM state for selected editable field."""
     if not await ensure_admin_callback_access(callback, session):
         return
 
@@ -78,59 +134,35 @@ async def process_edit_book_menu(
 
     book_id = int(book_id_str)
 
-    if action == "title":
-        await state.clear()
-        await state.update_data(edit_book_id=book_id)
-        await state.set_state(AdminManageBookStates.waiting_for_new_title)
-        await callback.message.answer("Введіть нову назву книги.")
-        await callback.answer()
-        return
-
-    if action == "author":
-        await state.clear()
-        await state.update_data(edit_book_id=book_id)
-        await state.set_state(AdminManageBookStates.waiting_for_new_author)
-        await callback.message.answer('Введіть нового автора або "-" щоб очистити поле.')
-        await callback.answer()
-        return
-
-    if action == "publisher":
-        await state.clear()
-        await state.update_data(edit_book_id=book_id)
-        await state.set_state(AdminManageBookStates.waiting_for_new_publisher)
-        await callback.message.answer('Введіть нове видавництво або "-" щоб очистити поле.')
-        await callback.answer()
-        return
-
-    if action == "genre":
-        await state.clear()
-        await state.update_data(edit_book_id=book_id)
-        await state.set_state(AdminManageBookStates.waiting_for_new_genre)
-        await callback.message.answer('Введіть новий жанр або "-" щоб очистити поле.')
-        await callback.answer()
-        return
-
-    if action == "language":
-        await state.clear()
-        await state.update_data(edit_book_id=book_id)
-        await state.set_state(AdminManageBookStates.waiting_for_new_language)
-        await callback.message.answer('Введіть нову мову або "-" щоб очистити поле.')
-        await callback.answer()
-        return
-
-    if action == "description":
-        await state.clear()
-        await state.update_data(edit_book_id=book_id)
-        await state.set_state(AdminManageBookStates.waiting_for_new_description)
-        await callback.message.answer('Введіть новий опис або "-" щоб очистити поле.')
-        await callback.answer()
-        return
+    state_mapping = {
+        "title": (
+            AdminManageBookStates.waiting_for_new_title,
+            "Введіть нову назву книги.",
+        ),
+        "author": (
+            AdminManageBookStates.waiting_for_new_author,
+            'Введіть нового автора або "-" щоб очистити поле.',
+        ),
+        "publisher": (
+            AdminManageBookStates.waiting_for_new_publisher,
+            'Введіть нове видавництво або "-" щоб очистити поле.',
+        ),
+        "genre": (
+            AdminManageBookStates.waiting_for_new_genre,
+            'Введіть новий жанр або "-" щоб очистити поле.',
+        ),
+        "language": (
+            AdminManageBookStates.waiting_for_new_language,
+            'Введіть нову мову або "-" щоб очистити поле.',
+        ),
+        "description": (
+            AdminManageBookStates.waiting_for_new_description,
+            'Введіть новий опис або "-" щоб очистити поле.',
+        ),
+    }
 
     if action == "cancel":
-        book = await get_book_by_id_service(
-            session=session,
-            book_id=book_id,
-        )
+        book = await get_book_by_id_service(session=session, book_id=book_id)
 
         await state.clear()
 
@@ -151,7 +183,17 @@ async def process_edit_book_menu(
         await callback.answer()
         return
 
-    await callback.answer("Невідома дія.", show_alert=True)
+    if action not in state_mapping:
+        await callback.answer("Невідома дія.", show_alert=True)
+        return
+
+    target_state, prompt = state_mapping[action]
+
+    await state.clear()
+    await state.update_data(edit_book_id=book_id)
+    await state.set_state(target_state)
+    await callback.message.answer(prompt)
+    await callback.answer()
 
 
 @router.message(AdminManageBookStates.waiting_for_new_title)
@@ -160,6 +202,7 @@ async def process_new_book_title(
     state: FSMContext,
     session: AsyncSession,
 ) -> None:
+    """Update book title."""
     if not await ensure_admin_message_access(message, session):
         return
 
@@ -173,15 +216,8 @@ async def process_new_book_title(
         await message.answer("Назва надто коротка. Спробуйте ще раз.")
         return
 
-    data = await state.get_data()
-    book_id = data.get("edit_book_id")
-
+    book_id = await _get_edit_book_id_or_reset(message, state)
     if book_id is None:
-        await state.clear()
-        await message.answer(
-            "Сталася помилка стану. Почніть редагування книги ще раз.",
-            reply_markup=get_admin_keyboard(),
-        )
         return
 
     result = await update_book_service(
@@ -191,19 +227,11 @@ async def process_new_book_title(
     )
 
     await state.clear()
-
-    if result == "book_not_found":
-        await message.answer("Книгу не знайдено.", reply_markup=get_admin_keyboard())
-        return
-
-    if result == "nothing_to_update":
-        await message.answer("Немає даних для оновлення.", reply_markup=get_admin_keyboard())
-        return
-
-    await message.answer(
-        "✅ Назву книги успішно оновлено.\n\n"
-        f"{await format_updated_book(result, session)}",
-        reply_markup=get_admin_keyboard(),
+    await _handle_update_result(
+        message=message,
+        result=result,
+        success_text="✅ Назву книги успішно оновлено.",
+        session=session,
     )
 
 
@@ -213,25 +241,21 @@ async def process_new_book_author(
     state: FSMContext,
     session: AsyncSession,
 ) -> None:
+    """Update book author."""
     if not await ensure_admin_message_access(message, session):
         return
 
-    raw_value = (message.text or "").strip()
-    new_author = None if raw_value == "-" else raw_value
+    new_author = _normalize_optional_text(message.text)
 
-    if new_author is not None and len(new_author) < 2:
-        await message.answer('Автор надто короткий. Спробуйте ще раз або введіть "-" щоб очистити поле.')
+    if _is_too_short(new_author):
+        await message.answer(
+            'Автор надто короткий. Спробуйте ще раз або введіть "-" '
+            "щоб очистити поле."
+        )
         return
 
-    data = await state.get_data()
-    book_id = data.get("edit_book_id")
-
+    book_id = await _get_edit_book_id_or_reset(message, state)
     if book_id is None:
-        await state.clear()
-        await message.answer(
-            "Сталася помилка стану. Почніть редагування книги ще раз.",
-            reply_markup=get_admin_keyboard(),
-        )
         return
 
     result = await update_book_service(
@@ -241,19 +265,11 @@ async def process_new_book_author(
     )
 
     await state.clear()
-
-    if result == "book_not_found":
-        await message.answer("Книгу не знайдено.", reply_markup=get_admin_keyboard())
-        return
-
-    if result == "nothing_to_update":
-        await message.answer("Немає даних для оновлення.", reply_markup=get_admin_keyboard())
-        return
-
-    await message.answer(
-        "✅ Автора книги успішно оновлено.\n\n"
-        f"{await format_updated_book(result, session)}",
-        reply_markup=get_admin_keyboard(),
+    await _handle_update_result(
+        message=message,
+        result=result,
+        success_text="✅ Автора книги успішно оновлено.",
+        session=session,
     )
 
 
@@ -263,25 +279,21 @@ async def process_new_book_publisher(
     state: FSMContext,
     session: AsyncSession,
 ) -> None:
+    """Update book publisher."""
     if not await ensure_admin_message_access(message, session):
         return
 
-    raw_value = (message.text or "").strip()
-    new_publisher = None if raw_value == "-" else raw_value
+    new_publisher = _normalize_optional_text(message.text)
 
-    if new_publisher is not None and len(new_publisher) < 2:
-        await message.answer('Видавництво надто коротке. Спробуйте ще раз або введіть "-" щоб очистити поле.')
+    if _is_too_short(new_publisher):
+        await message.answer(
+            'Видавництво надто коротке. Спробуйте ще раз або введіть "-" '
+            "щоб очистити поле."
+        )
         return
 
-    data = await state.get_data()
-    book_id = data.get("edit_book_id")
-
+    book_id = await _get_edit_book_id_or_reset(message, state)
     if book_id is None:
-        await state.clear()
-        await message.answer(
-            "Сталася помилка стану. Почніть редагування книги ще раз.",
-            reply_markup=get_admin_keyboard(),
-        )
         return
 
     result = await update_book_service(
@@ -291,19 +303,11 @@ async def process_new_book_publisher(
     )
 
     await state.clear()
-
-    if result == "book_not_found":
-        await message.answer("Книгу не знайдено.", reply_markup=get_admin_keyboard())
-        return
-
-    if result == "nothing_to_update":
-        await message.answer("Немає даних для оновлення.", reply_markup=get_admin_keyboard())
-        return
-
-    await message.answer(
-        "✅ Видавництво книги успішно оновлено.\n\n"
-        f"{await format_updated_book(result, session)}",
-        reply_markup=get_admin_keyboard(),
+    await _handle_update_result(
+        message=message,
+        result=result,
+        success_text="✅ Видавництво книги успішно оновлено.",
+        session=session,
     )
 
 
@@ -313,25 +317,21 @@ async def process_new_book_genre(
     state: FSMContext,
     session: AsyncSession,
 ) -> None:
+    """Update book genre."""
     if not await ensure_admin_message_access(message, session):
         return
 
-    raw_value = (message.text or "").strip()
-    new_genre = None if raw_value == "-" else raw_value
+    new_genre = _normalize_optional_text(message.text)
 
-    if new_genre is not None and len(new_genre) < 2:
-        await message.answer('Жанр надто короткий. Спробуйте ще раз або введіть "-" щоб очистити поле.')
+    if _is_too_short(new_genre):
+        await message.answer(
+            'Жанр надто короткий. Спробуйте ще раз або введіть "-" '
+            "щоб очистити поле."
+        )
         return
 
-    data = await state.get_data()
-    book_id = data.get("edit_book_id")
-
+    book_id = await _get_edit_book_id_or_reset(message, state)
     if book_id is None:
-        await state.clear()
-        await message.answer(
-            "Сталася помилка стану. Почніть редагування книги ще раз.",
-            reply_markup=get_admin_keyboard(),
-        )
         return
 
     result = await update_book_service(
@@ -341,19 +341,11 @@ async def process_new_book_genre(
     )
 
     await state.clear()
-
-    if result == "book_not_found":
-        await message.answer("Книгу не знайдено.", reply_markup=get_admin_keyboard())
-        return
-
-    if result == "nothing_to_update":
-        await message.answer("Немає даних для оновлення.", reply_markup=get_admin_keyboard())
-        return
-
-    await message.answer(
-        "✅ Жанр книги успішно оновлено.\n\n"
-        f"{await format_updated_book(result, session)}",
-        reply_markup=get_admin_keyboard(),
+    await _handle_update_result(
+        message=message,
+        result=result,
+        success_text="✅ Жанр книги успішно оновлено.",
+        session=session,
     )
 
 
@@ -363,25 +355,21 @@ async def process_new_book_language(
     state: FSMContext,
     session: AsyncSession,
 ) -> None:
+    """Update book language."""
     if not await ensure_admin_message_access(message, session):
         return
 
-    raw_value = (message.text or "").strip()
-    new_language = None if raw_value == "-" else raw_value
+    new_language = _normalize_optional_text(message.text)
 
-    if new_language is not None and len(new_language) < 2:
-        await message.answer('Мова надто коротка. Спробуйте ще раз або введіть "-" щоб очистити поле.')
+    if _is_too_short(new_language):
+        await message.answer(
+            'Мова надто коротка. Спробуйте ще раз або введіть "-" '
+            "щоб очистити поле."
+        )
         return
 
-    data = await state.get_data()
-    book_id = data.get("edit_book_id")
-
+    book_id = await _get_edit_book_id_or_reset(message, state)
     if book_id is None:
-        await state.clear()
-        await message.answer(
-            "Сталася помилка стану. Почніть редагування книги ще раз.",
-            reply_markup=get_admin_keyboard(),
-        )
         return
 
     result = await update_book_service(
@@ -391,19 +379,11 @@ async def process_new_book_language(
     )
 
     await state.clear()
-
-    if result == "book_not_found":
-        await message.answer("Книгу не знайдено.", reply_markup=get_admin_keyboard())
-        return
-
-    if result == "nothing_to_update":
-        await message.answer("Немає даних для оновлення.", reply_markup=get_admin_keyboard())
-        return
-
-    await message.answer(
-        "✅ Мову книги успішно оновлено.\n\n"
-        f"{await format_updated_book(result, session)}",
-        reply_markup=get_admin_keyboard(),
+    await _handle_update_result(
+        message=message,
+        result=result,
+        success_text="✅ Мову книги успішно оновлено.",
+        session=session,
     )
 
 
@@ -413,21 +393,14 @@ async def process_new_book_description(
     state: FSMContext,
     session: AsyncSession,
 ) -> None:
+    """Update book description."""
     if not await ensure_admin_message_access(message, session):
         return
 
-    raw_value = (message.text or "").strip()
-    new_description = None if raw_value == "-" else raw_value
+    new_description = _normalize_optional_text(message.text)
 
-    data = await state.get_data()
-    book_id = data.get("edit_book_id")
-
+    book_id = await _get_edit_book_id_or_reset(message, state)
     if book_id is None:
-        await state.clear()
-        await message.answer(
-            "Сталася помилка стану. Почніть редагування книги ще раз.",
-            reply_markup=get_admin_keyboard(),
-        )
         return
 
     result = await update_book_service(
@@ -437,22 +410,9 @@ async def process_new_book_description(
     )
 
     await state.clear()
-
-    if result == "book_not_found":
-        await message.answer("Книгу не знайдено.", reply_markup=get_admin_keyboard())
-        return
-
-    if result == "nothing_to_update":
-        await message.answer("Немає даних для оновлення.", reply_markup=get_admin_keyboard())
-        return
-
-    await message.answer(
-        "✅ Опис книги успішно оновлено.\n\n"
-        f"{await format_updated_book(result, session)}",
-        reply_markup=get_admin_keyboard(),
+    await _handle_update_result(
+        message=message,
+        result=result,
+        success_text="✅ Опис книги успішно оновлено.",
+        session=session,
     )
-
-
-async def format_updated_book(book, session: AsyncSession) -> str:
-    from .common import format_book_info
-    return await format_book_info(book, session)
