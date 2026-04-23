@@ -54,12 +54,36 @@ def get_edit_book_fields_keyboard(book_id: int) -> InlineKeyboardMarkup:
     builder.adjust(1)
     return builder.as_markup()
 
-def get_books_catalog_keyboard(
+def get_book_separation_keyboard():
+    builder = InlineKeyboardBuilder()
+    builder.button(text="Доступні книги", callback_data="books_filter:available")
+    builder.button(text="Книги на руках", callback_data="books_filter:taken")
+    builder.button(text="Показати всі", callback_data="books_filter:all")
+    builder.button(text="До адмін-панелі", callback_data="books_filter:back")
+    builder.adjust(1)
+    return builder.as_markup()
+
+def truncate_button_title(title: str, max_len: int = 24) -> str:
+    return title if len(title) <= max_len else title[:max_len - 3] + "..."
+
+
+def get_books_catalog_open_keyboard(
+    books: list,
     current_page: int,
     total_pages: int,
     filter_value: str,
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
+
+    for book in books:
+        status_icon = "📕 Недоступна" if book.taken_by is not None else "📗 Доступна"
+        short_title = truncate_button_title(book.title)
+        builder.button(
+            text=f"ID {book.id} · {short_title} · {status_icon}",
+            callback_data=f"open_book_from_catalog:{book.id}",
+        )
+
+    builder.adjust(1)
 
     if current_page > 1:
         builder.button(
@@ -68,11 +92,15 @@ def get_books_catalog_keyboard(
         )
     else:
         builder.button(
-            text="⬅️ Назад", callback_data="noop"
+            text="⬅️ Назад",
+            callback_data="noop",
         )
-                
-    builder.button(text=f"{current_page}/{total_pages}", callback_data="noop")
-    
+
+    builder.button(
+        text=f"{current_page}/{total_pages}",
+        callback_data="noop",
+    )
+
     if current_page < total_pages:
         builder.button(
             text="➡️ Далі",
@@ -81,17 +109,8 @@ def get_books_catalog_keyboard(
     else:
         builder.button(
             text="➡️ Далі",
-            callback_data="noop"
+            callback_data="noop",
         )
 
-    builder.adjust(3)
-    return builder.as_markup()
-
-def get_book_separation_keyboard():
-    builder = InlineKeyboardBuilder()
-    builder.button(text="Доступні книги", callback_data="books_filter:available")
-    builder.button(text="Книги на руках", callback_data="books_filter:taken")
-    builder.button(text="Показати всі", callback_data="books_filter:all")
-    builder.button(text="До адмін-панелі", callback_data="books_filter:back")
-    builder.adjust(1)
+    builder.adjust(*([1] * len(books)), 3)
     return builder.as_markup()
