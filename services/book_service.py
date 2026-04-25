@@ -50,6 +50,36 @@ async def create_book_service(
     return book
 
 
+async def duplicate_book_service(
+    session: AsyncSession,
+    book_id: int,
+):
+    book = await get_book_by_id(session, book_id)
+    if book is None:
+        return None
+
+    new_book = await create_book(
+        session=session,
+        title=book.title,
+        author=book.author,
+        publisher=book.publisher,
+        genre=book.genre,
+        language=book.language,
+        description=book.description,
+    )
+
+    await create_log_entry(
+        session,
+        action="duplicate_book",
+        user_id=None,
+        book_id=new_book.id,
+        book_title=new_book.title,
+        user_full_name=None,
+    )
+
+    return new_book
+
+
 async def get_book_by_id_service(
     session: AsyncSession,
     book_id: int,

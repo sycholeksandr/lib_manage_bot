@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.models.user import User
 from db.repositories.user_repository import get_user_by_id, create_user
-from db.repositories.user_repository import set_user_admin_status
+from db.repositories.user_repository import set_user_admin_status 
 
 async def create_user_or_get_existing(
     session: AsyncSession,
@@ -15,7 +15,7 @@ async def create_user_or_get_existing(
 
     if existing_user is not None:
         return existing_user
-    await create_log_entry(session, "create_user", user_id, None, None, full_name)
+    # await create_log_entry(session, "create_user", user_id, None, None, full_name)
     return await create_user(session, user_id, full_name, contact, is_admin, tg_username)
 
 async def set_user_admin_status_service(
@@ -42,6 +42,6 @@ async def update_user_tg_username_service(
         return False
 
     user.tg_username = tg_username
-    await create_log_entry(session, "update_user_tg_username", user_id, None, None, user.full_name)
+    # await create_log_entry(session, "update_user_tg_username", user_id, None, None, user.full_name)
     await session.commit()
     return True

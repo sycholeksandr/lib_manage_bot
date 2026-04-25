@@ -43,6 +43,10 @@ def get_admin_book_actions_keyboard(
         callback_data=f"show_qr_code:{book_id}",
     )
     builder.button(
+        text="Створити копію",
+        callback_data=f"duplicate_book:{book_id}",
+    )
+    builder.button(
         text="Видалити",
         callback_data=f"delete_book:{book_id}",
     )
