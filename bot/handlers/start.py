@@ -16,6 +16,7 @@ from services.book_service import (
 )
 from bot.states.registration import RegistrationStates
 from bot.handlers.books import send_book_view
+from bot.keyboards.reply import get_main_menu_keyboard
 
 router = Router()
 
@@ -134,7 +135,8 @@ async def process_contact(
 
     await message.answer(
         f"Реєстрацію завершено, {full_name} ✅\n"
-        f"Ваш контакт: {contact} ✅"
+        f"Ваш контакт: {contact} ✅",
+        reply_markup=get_main_menu_keyboard(),
     )
 
     if start_payload:

@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from services.book_service import get_book_by_id_service, take_book_service, return_book_service
 from services.user_services import get_user_by_id_service
 from bot.keyboards.inline import get_take_book_confirmation_keyboard, get_return_book_confirmation_keyboard
-
+from bot.keyboards.reply import get_main_menu_keyboard
 router = Router()
 
 async def send_book_view(
@@ -74,21 +74,22 @@ async def process_take_book(
 
     if result == "success":
         await callback.message.edit_text("✅ Книгу успішно взято.")
+        await callback.message.answer("Відриваю меню.", reply_markup=get_main_menu_keyboard())
         await callback.answer()
         return
 
     if result == "book_not_found":
         await callback.message.edit_text("❌ Книгу не знайдено.")
-        await callback.answer()
+        await callback.message.answer("Відриваю меню.", reply_markup=get_main_menu_keyboard())
         return
 
     if result == "book_already_taken":
         await callback.message.edit_text("⚠️ Ця книга вже зайнята.")
-        await callback.answer()
+        await callback.message.answer("Відриваю меню.", reply_markup=get_main_menu_keyboard())
         return
     if result == "user_book_limit_reached":
         await callback.message.edit_text("⚠️ Ви не можете взяти більше 3 книг одночасно.")
-        await callback.answer()
+        await callback.message.answer("Відриваю меню.", reply_markup=get_main_menu_keyboard())
         return
         
     await callback.message.edit_text("Сталася невідома помилка.")
@@ -121,18 +122,21 @@ async def process_return_book(
     )
     if result == "success":
         await callback.message.edit_text("✅ Книгу успішно повернуто.")
-        await callback.answer()
+        await callback.message.answer("Відриваю меню.", reply_markup=get_main_menu_keyboard())
         return  
     if result == "book_not_found":
         await callback.message.edit_text("❌ Книгу не знайдено.")
+        await callback.message.answer("Відриваю меню.", reply_markup=get_main_menu_keyboard())
         await callback.answer()
         return
     if result == "book_not_taken":
         await callback.message.edit_text("⚠️ Ця книга не була взята.")
+        await callback.message.answer("Відриваю меню.", reply_markup=get_main_menu_keyboard())
         await callback.answer()
         return
     
     await callback.message.edit_text("Сталася невідома помилка.")
+    await callback.message.answer("Відриваю меню.", reply_markup=get_main_menu_keyboard())
     await callback.answer()
     
 @router.callback_query(F.data.startswith("cancel_book_action:"))

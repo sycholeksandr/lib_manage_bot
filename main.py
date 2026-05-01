@@ -6,9 +6,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
-from bot.handlers.start import router as start_router
-from bot.handlers.books import router as books_router
-from bot.handlers.admin import get_admin_router
+from bot.router import register_routers
 from bot.middlewares.db import DbSessionMiddleware
 from core.config import settings
 from db.connection import async_session_factory
@@ -26,11 +24,8 @@ async def main() -> None:
     )
 
     dp = Dispatcher()
-    admin_router = get_admin_router()
-    
-    dp.include_router(start_router)
-    dp.include_router(books_router)
-    dp.include_router(admin_router)
+
+    register_routers(dp)
 
     dp.update.middleware(DbSessionMiddleware(async_session_factory))
 
