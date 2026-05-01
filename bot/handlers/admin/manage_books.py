@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.states.admin import AdminManageBookStates
 from services.book_service import get_book_by_id_service, duplicate_book_service
+from bot.keyboards.reply import get_admin_keyboard
 
 from .common import (
     ensure_admin_message_access,
@@ -60,10 +61,11 @@ async def process_book_id_for_manage(
     await send_book_card(message, session, book)
 
 @router.callback_query(F.data.startswith("duplicate_book:"))
-async def process_duplicate_book(
+async def process_duplicate_book_request(
     callback: CallbackQuery,
+    state: FSMContext,
     session: AsyncSession,
-):
+) -> None:
     if not await ensure_admin_callback_access(callback, session):
         return
 
@@ -75,18 +77,80 @@ async def process_duplicate_book(
 
     book_id = int(book_id_str)
 
-    new_book = await duplicate_book_service(
+    book = await get_book_by_id_service(
         session=session,
         book_id=book_id,
     )
 
-    if new_book is None:
+    if book is None:
         await callback.answer("Книгу не знайдено.", show_alert=True)
         return
 
-    await callback.answer("Копію створено ✅", show_alert=True)
+    await state.clear()
+    await state.update_data(duplicate_book_id=book_id)
+    await state.set_state(AdminManageBookStates.waiting_for_duplicate_count)
 
     await callback.message.answer(
-        await format_book_info(new_book, session),
-        reply_markup=get_admin_book_actions_keyboard(new_book.id),
+        "Скільки копій створити?\n\n"
+        "Введіть число від 1 до 50."
+    )
+    await callback.answer()
+
+@router.message(AdminManageBookStates.waiting_for_duplicate_count)
+async def process_duplicate_book_count(
+    message: Message,
+    state: FSMContext,
+    session: AsyncSession,
+) -> None:
+    if not await ensure_admin_message_access(message, session):
+        return
+
+    count_raw = (message.text or "").strip()
+
+    if not count_raw.isdigit():
+        await message.answer("Кількість має бути цілим числом. Спробуйте ще раз.")
+        return
+
+    count = int(count_raw)
+
+    if count < 1:
+        await message.answer("Кількість має бути більшою за 0.")
+        return
+
+    if count > 50:
+        await message.answer("За один раз можна створити не більше 50 копій.")
+        return
+
+    data = await state.get_data()
+    book_id = data.get("duplicate_book_id")
+
+    if book_id is None:
+        await state.clear()
+        await message.answer(
+            "Сталася помилка стану. Почніть створення копій ще раз.",
+            reply_markup=get_admin_keyboard(),
+        )
+        return
+
+    created_books = await duplicate_book_service(
+        session=session,
+        book_id=book_id,
+        count=count,
+    )
+
+    await state.clear()
+
+    if created_books is None:
+        await message.answer(
+            "Книгу не знайдено.",
+            reply_markup=get_admin_keyboard(),
+        )
+        return
+
+    created_ids = ", ".join(str(book.id) for book in created_books)
+
+    await message.answer(
+        f"✅ Створено копій: {len(created_books)}\n"
+        f"Нові ID: {created_ids}",
+        reply_markup=get_admin_keyboard(),
     )

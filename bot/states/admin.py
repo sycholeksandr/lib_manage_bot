@@ -17,3 +17,4 @@ class AdminManageBookStates(StatesGroup):
     waiting_for_new_genre = State()
     waiting_for_new_language = State()
     waiting_for_new_description = State()
+    waiting_for_duplicate_count = State()

@@ -53,31 +53,38 @@ async def create_book_service(
 async def duplicate_book_service(
     session: AsyncSession,
     book_id: int,
+    count: int = 1,
 ):
-    book = await get_book_by_id(session, book_id)
-    if book is None:
+    source_book = await get_book_by_id(session, book_id)
+
+    if source_book is None:
         return None
 
-    new_book = await create_book(
-        session=session,
-        title=book.title,
-        author=book.author,
-        publisher=book.publisher,
-        genre=book.genre,
-        language=book.language,
-        description=book.description,
-    )
+    created_books = []
 
-    await create_log_entry(
-        session,
-        action="duplicate_book",
-        user_id=None,
-        book_id=new_book.id,
-        book_title=new_book.title,
-        user_full_name=None,
-    )
+    for _ in range(count):
+        new_book = await create_book(
+            session=session,
+            title=source_book.title,
+            author=source_book.author,
+            publisher=source_book.publisher,
+            genre=source_book.genre,
+            language=source_book.language,
+            description=source_book.description,
+        )
 
-    return new_book
+        await create_log_entry(
+            session,
+            "duplicate_book",
+            None,
+            new_book.id,
+            new_book.title,
+            user_full_name=None,
+        )
+
+        created_books.append(new_book)
+
+    return created_books
 
 
 async def get_book_by_id_service(
